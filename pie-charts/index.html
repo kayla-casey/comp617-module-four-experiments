@@ -58,7 +58,7 @@
             .innerRadius(radius * 0.6)
             .outerRadius(radius * 0.6);
 
-            d3.csv("Iris.csv").then(data => {
+            d3.csv("../Iris.csv").then(data => {
             const speciesCounts = Array.from(
                 d3.rollup(data, v => v.length, d => d.Species),
                 ([species, count]) => ({ species, count })
