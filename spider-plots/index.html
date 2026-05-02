@@ -1,1 +1,320 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Iris Spider Charts</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #spider-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 35px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .chart-container {
+            text-align: center;
+        }
+        .chart-title {
+            font-size: 17px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 4px;
+            font-size: 13px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .legend-swatch {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div id="spider-grid"></div>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
+        const chartConfigs = [
+            { title: "Random Colors + Hover Labels", colorMode: "random", labels: "hover"},
+            { title: "Purple Ombre + Hover Labels", colorMode: "purple", labels: "hover"},
+            { title: "Random Colors + Always Visible Labels",colorMode: "random", labels: "always"},
+            { title: "Purple Ombre + Always Visible Labels", colorMode: "purple", labels: "always"}
+        ];
 
+        const randomColors = ["#FF6B6B", "#4ECDC4", "#FFD93D"];
+        const purpleColors = ["#D8B4FE", "#A855F7", "#6B21A8"];
+
+        const features = [
+            { label: "Sepal Length", key: "SepalLengthCm"},
+            { label: "Sepal Width", key: "SepalWidthCm"},
+            { label: "Petal Length",key: "PetalLengthCm"},
+            { label: "Petal Width", key: "PetalWidthCm"}
+        ];
+
+        const svgW = 500;
+        const svgH = 460;
+        const radar_r = 145;
+        const levels = 5;
+        const N = features.length;
+
+        function angle(i) {
+            return (2 * Math.PI * i / N) - Math.PI / 2;
+        }
+
+        function polarXY(r, i) {
+            return { x: r * Math.cos(angle(i)), y: r * Math.sin(angle(i)) };
+        }
+
+        d3.csv("../Iris.csv").then(data => {
+            const allSpecies = [...new Set(data.map(d => d.Species))];
+
+            // min/max for consistent data across all charts
+            const scales = {};
+            features.forEach(f => {
+                const vals = data.map(d => +d[f.key]);
+                scales[f.key] = { min: d3.min(vals), max: d3.max(vals) };
+            });
+
+            // mean per species per feature
+            const speciesData = allSpecies.map(sp => {
+                const rows = data.filter(d => d.Species === sp);
+                const values = features.map((f, fi) => {
+                    const mean = d3.mean(rows, d => +d[f.key]);
+                    const norm = (mean - scales[f.key].min) / (scales[f.key].max - scales[f.key].min); // normalize the data so it all scales nicely
+                    return { label: f.label, mean: +mean.toFixed(2), norm };
+                });
+                return { species: sp, shortName: sp.replace("Iris-", ""), values };
+            });
+
+            const container = d3.select("#spider-grid");
+
+            chartConfigs.forEach(config => {
+                const palette = config.colorMode === "purple" ? purpleColors : randomColors;
+                const colorScale = d3.scaleOrdinal().domain(allSpecies).range(palette);
+
+                const chartDiv = container.append("div").attr("class", "chart-container");
+
+                chartDiv.append("div").attr("class", "chart-title").text(config.title);
+
+                // legend
+                const legend = chartDiv.append("div").attr("class", "legend");
+                allSpecies.forEach(sp => {
+                    const item = legend.append("div").attr("class", "legend-item");
+                    item.append("div")
+                        .attr("class", "legend-swatch")
+                        .style("background-color", colorScale(sp));
+                    item.append("span").text(sp.replace("Iris-", ""));
+                });
+
+                const svg = chartDiv.append("svg").attr("width", svgW).attr("height", svgH);
+                const g = svg.append("g").attr("transform", `translate(${svgW / 2},${svgH / 2})`);
+
+                // concentric polygon aka spider grud
+                for (let lvl = 1; lvl <= levels; lvl++) {
+                    const r = radar_r * lvl / levels;
+                    const pts = d3.range(N).map(i => {
+                        const p = polarXY(r, i);
+                        return `${p.x},${p.y}`;
+                    }).join(" ");
+                    g.append("polygon")
+                        .attr("points", pts)
+                        .attr("fill", "none")
+                        .attr("stroke", "#ccc")
+                        .attr("stroke-width", 0.5)
+                        .attr("pointer-events", "none");
+                }
+
+                // axis lines and labels
+                features.forEach((f, i) => {
+                    const tip = polarXY(radar_r, i);
+                    g.append("line")
+                        .attr("x1", 0).attr("y1", 0)
+                        .attr("x2", tip.x).attr("y2", tip.y)
+                        .attr("stroke", "#bbb")
+                        .attr("stroke-width", 1)
+                        .attr("pointer-events", "none");
+
+                    const pad = 14;
+                    const lp = polarXY(radar_r + pad, i);
+
+                    // text based on position relative to the center
+                    let anchor = "middle";
+                    let baseline = "middle";
+                    if (lp.x > 5)  anchor   = "start";
+                    if (lp.x < -5) anchor   = "end";
+                    if (lp.y < -5) baseline = "auto";
+                    if (lp.y > 5)  baseline = "hanging";
+
+                    g.append("text")
+                        .attr("x", lp.x)
+                        .attr("y", lp.y)
+                        .attr("text-anchor", anchor)
+                        .attr("dominant-baseline", baseline)
+                        .style("font-size", "12px")
+                        .style("fill", "#555")
+                        .style("pointer-events", "none")
+                        .text(f.label);
+                });
+
+                // draw the species polygons but in reverse order so Setosa is on top since otherwise it is not able to be highlighted
+                const polygonEls = [...speciesData].reverse().map(sd => {
+                    const pts = sd.values.map((v, i) => {
+                        const p = polarXY(radar_r * v.norm, i);
+                        return `${p.x},${p.y}`;
+                    }).join(" ");
+
+                    const poly = g.append("polygon")
+                        .attr("points", pts)
+                        .attr("fill", colorScale(sd.species))
+                        .attr("fill-opacity", 0.25)
+                        .attr("stroke", colorScale(sd.species))
+                        .attr("stroke-width", 2)
+                        .style("cursor", "pointer");
+
+                    return { sd, poly };
+                });
+
+                // always-visible labels: species names in corner + values stacked under each axis label
+                if (config.labels === "always") {
+                    // species names stacked in the bottom right corner
+                    // arrange the first number in attr("x", ...) to move them left/right
+                    speciesData.forEach((sd, si) => {
+                        g.append("text")
+                            .attr("x", svgW / 2 - 35)
+                            .attr("y", svgH / 2 - 12 - (speciesData.length - 1 - si) * 15)
+                            .attr("text-anchor", "end")
+                            .style("font-size", "12px")
+                            .style("font-weight", "bold")
+                            .style("fill", colorScale(sd.species))
+                            .style("pointer-events", "none")
+                            .text(sd.shortName);
+                    });
+
+                    // values get stacked near each axis label colored by species
+                    // the  axis stacks upward (away from chart) and all others go downward
+                    features.forEach((f, fi) => {
+                        const lp = polarXY(radar_r + 14, fi);
+                        let anchor = "middle";
+                        if (lp.x > 5)  anchor = "start";
+                        if (lp.x < -5) anchor = "end";
+                        const yDir    = (fi === 0) ? -1 : 1;
+                        const leadGap = [10, 4, 14, 4][fi];
+
+                        speciesData.forEach((sd, si) => {
+                            g.append("text")
+                                .attr("x", lp.x)
+                                .attr("y", lp.y + yDir * (leadGap + (si + 1) * 11))
+                                .attr("text-anchor", anchor)
+                                .attr("dominant-baseline", "middle")
+                                .style("font-size", "11px")
+                                .style("fill", colorScale(sd.species))
+                                .style("pointer-events", "none")
+                                .text(sd.values[fi].mean);
+                        });
+                    });
+                }
+
+                // hover tooltip anchored to bottom-right corner
+                const tooltip = g.append("text")
+                    .attr("x", svgW / 2 - 35)
+                    .attr("y", svgH / 2 - 12)
+                    .attr("text-anchor", "end")
+                    .style("font-size", "14px")
+                    .style("font-weight", "bold")
+                    .style("pointer-events", "none")
+                    .style("opacity", 0);
+
+                // one value label per axis, shown on hover at the same position as always-visible stacks
+                const hoverValueLabels = features.map((f, fi) => {
+                    const lp = polarXY(radar_r + 14, fi);
+                    let anchor = "middle";
+                    if (lp.x > 5)  anchor = "start";
+                    if (lp.x < -5) anchor = "end";
+                    const yDir    = (fi === 0) ? -1 : 1;
+                    const leadGap = [10, 4, 14, 4][fi];
+                    return g.append("text")
+                        .attr("x", lp.x)
+                        .attr("y", lp.y + yDir * (leadGap + 11))
+                        .attr("text-anchor", anchor)
+                        .attr("dominant-baseline", "middle")
+                        .style("font-size", "11px")
+                        .style("pointer-events", "none")
+                        .style("opacity", 0);
+                });
+
+                // precompute each species polygon center (useful for hovering since the shapes are irregular)
+                const centroids = speciesData.map(sd => ({
+                    sd,
+                    cx: d3.mean(sd.values.map((v, i) => polarXY(radar_r * v.norm, i).x)),
+                    cy: d3.mean(sd.values.map((v, i) => polarXY(radar_r * v.norm, i).y))
+                }));
+
+                polygonEls.forEach(({ poly }) => poly.style("pointer-events", "none"));
+
+                // invisible rectangle covering the full SVG gets all mouse events
+                svg.append("rect")
+                    .attr("x", 0).attr("y", 0)
+                    .attr("width", svgW).attr("height", svgH)
+                    .attr("fill", "none")
+                    .attr("pointer-events", "all")
+                    .on("mousemove", function (event) {
+                        const [mx, my] = d3.pointer(event, g.node());
+
+                        // highlights the species whose center is nearest the cursor
+                        let nearest = centroids[0];
+                        let minDist = Infinity;
+                        centroids.forEach(c => {
+                            const dist = Math.hypot(mx - c.cx, my - c.cy);
+                            if (dist < minDist) { minDist = dist; nearest = c; }
+                        });
+
+                        polygonEls.forEach(({ sd, poly }) => {
+                            if (sd.species === nearest.sd.species) {
+                                poly.attr("fill-opacity", 0.5)
+                                    .attr("stroke-width", 3)
+                                    .attr("stroke-opacity", 1);
+                            } else {
+                                poly.attr("fill-opacity", 0.08)
+                                    .attr("stroke-opacity", 0.3)
+                                    .attr("stroke-width", 2);
+                            }
+                        });
+
+                        if (config.labels === "hover") {
+                            tooltip
+                                .style("fill", colorScale(nearest.sd.species))
+                                .style("opacity", 1)
+                                .text(nearest.sd.shortName);
+                            hoverValueLabels.forEach((lbl, fi) => {
+                                lbl.style("fill", colorScale(nearest.sd.species))
+                                   .style("opacity", 1)
+                                   .text(nearest.sd.values[fi].mean);
+                            });
+                        }
+                    })
+                    .on("mouseout", function () {
+                        polygonEls.forEach(({ poly }) => {
+                            poly.attr("fill-opacity", 0.25)
+                                .attr("stroke-opacity", 1)
+                                .attr("stroke-width", 2);
+                        });
+                        tooltip.style("opacity", 0);
+                        hoverValueLabels.forEach(lbl => lbl.style("opacity", 0));
+                    });
+            });
+        });
+    </script>
+</body>
+</html>
