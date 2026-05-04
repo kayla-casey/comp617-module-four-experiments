@@ -151,12 +151,20 @@
                     .append("text")
                     .attr("transform", d => `translate(${labelArc.centroid(d)})`)
                     .attr("text-anchor", "middle")
-                    .attr("dominant-baseline", "middle")
                     .style("font-size", "12px")
                     .style("font-weight", "bold")
                     .style("pointer-events", "none")
                     .style("opacity", config.labels === "always" ? 1 : 0)
-                    .text(d => `${d.data.species}: ${d.data.value.toFixed(1)}`);
+                    .each(function(d) {
+                        d3.select(this).append("tspan")
+                            .attr("x", 0)
+                            .attr("dy", "-0.4em")
+                            .text(d.data.species);
+                        d3.select(this).append("tspan")
+                            .attr("x", 0)
+                            .attr("dy", "1.2em")
+                            .text(d.data.value.toFixed(1));
+                    });
 
                 slices
                     .on("mouseover", function (event, d) {
