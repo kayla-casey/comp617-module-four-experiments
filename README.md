@@ -1,7 +1,7 @@
 # Four Ways to See Iris: Exploring Visualization Design Choices
 
 **A Cognitively-Driven Design Experiment**
-Group 13: Maria Sigmon, Bhargavi Chinni, Katie Sugg, and Kayla Casey
+| Group 13: Maria Sigmon, Bhargavi Chinni, Katie Sugg, and Kayla Casey
 
 ## Deployed Site
 
