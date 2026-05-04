@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Iris Pie Charts</title>
+</head>
+<style>
+    nav {
+        margin-top: 25px;
+        text-align: center;
+    }
+
+    nav a {
+        text-decoration: none;
+        color: #444;
+        background-color: #f0f0f0;
+        margin: 0 12px;
+        padding: 8px 14px;
+        border-radius: 8px;
+        transition: 0.2s;
+    }
+
+    nav a:hover {
+        background-color: #e5e7eb;
+    }
+</style>
+
+<body>
+    <header>
+        <h1 style="text-align: center; font-family: Arial, sans-serif;">Iris Pie Charts</h1>
+    </header>
+    <nav>
+        <a href="index.html">Home</a>
+    </nav>
+
+    <div id="pie-grid"></div>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <script>
+        const width = 260;
+        const height = 260;
+        const radius = Math.min(width, height) / 2 - 25;
+
+        const chartConfigs = [
+            {
+                title: "Random Colors + Hover Labels",
+                colorMode: "random",
+                labels: "hover"
+            },
+            {
+                title: "Purple Ombre + Hover Labels",
+                colorMode: "purple",
+                labels: "hover"
+            },
+            {
+                title: "Random Colors + Always Visible Labels",
+                colorMode: "random",
+                labels: "always"
+            },
+            {
+                title: "Purple Ombre + Always Visible Labels",
+                colorMode: "purple",
+                labels: "always"
+            }
+        ];
+
+        const randomColors = [
+            "#FF6B6B",
+            "#4ECDC4",
+            "#FFD93D"
+        ];
+
+        const purpleColors = [
+            "#D8B4FE",
+            "#C58FF7",
+            "#AB5DF5"
+        ];
+
+        const pie = d3.pie()
+            .value(d => d.value);
+
+        const arc = d3.arc()
+            .innerRadius(0)
+            .outerRadius(radius);
+
+        const labelArc = d3.arc()
+            .innerRadius(radius * 0.6)
+            .outerRadius(radius * 0.6);
+
+        const hoverArc = d3.arc()
+            .innerRadius(0)
+            .outerRadius(radius - 2);
+
+        d3.csv("../Iris.csv").then(data => {
+            const speciesCounts = Array.from(
+                d3.rollup(
+                    data,
+                    v => d3.sum(v, d => +d.SepalLengthCm),
+                    d => d.Species
+                ),
+                ([species, value]) => ({ species, value })
+            );
+
+            const container = d3.select("#pie-grid")
+                .style("display", "grid")
+                .style("grid-template-columns", "repeat(2, 1fr)")
+                .style("gap", "35px")
+                .style("max-width", "700px")
+                .style("margin", "0 auto")
+                .style("font-family", "Arial, sans-serif");
+
+            chartConfigs.forEach(config => {
+                const colorScale = d3.scaleOrdinal()
+                    .domain(speciesCounts.map(d => d.species))
+                    .range(config.colorMode === "purple" ? purpleColors : randomColors);
+
+                const chartDiv = container.append("div")
+                    .style("text-align", "center");
+
+                chartDiv.append("h3")
+                    .text(config.title)
+                    .style("font-size", "15px")
+                    .style("margin-bottom", "8px");
+
+                const svg = chartDiv.append("svg")
+                    .attr("width", width)
+                    .attr("height", height);
+
+                const g = svg.append("g")
+                    .attr("transform", `translate(${width / 2}, ${height / 2})`);
+
+                const slices = g.selectAll("path")
+                    .data(pie(speciesCounts))
+                    .enter()
+                    .append("path")
+                    .attr("d", arc)
+                    .attr("fill", d => colorScale(d.data.species))
+                    .attr("stroke", "white")
+                    .attr("stroke-width", 2);
+
+                const highlight = g.append("path")
+                    .attr("fill", "none")
+                    .attr("stroke", "none")
+                    .attr("stroke-width", 0)
+                    .attr("pointer-events", "none")
+                    .attr("stroke-linejoin", "round");
+
+                const labels = g.selectAll("text")
+                    .data(pie(speciesCounts))
+                    .enter()
+                    .append("text")
+                    .attr("transform", d => `translate(${labelArc.centroid(d)})`)
+                    .attr("text-anchor", "middle")
+                    .attr("dominant-baseline", "middle")
+                    .style("font-size", "12px")
+                    .style("font-weight", "bold")
+                    .style("pointer-events", "none")
+                    .style("opacity", config.labels === "always" ? 1 : 0)
+                    .text(d => `${d.data.species}: ${d.data.value.toFixed(1)}`);
+
+                slices
+                    .on("mouseover", function (event, d) {
+                        highlight
+                            .datum(d)
+                            .attr("d", hoverArc)
+                            .attr("stroke", "black")
+                            .attr("stroke-width", 4);
+
+                        if (config.labels === "hover") {
+                            labels
+                                .filter(labelData => labelData.data.species === d.data.species)
+                                .raise()
+                                .style("opacity", 1);
+                        }
+                    })
+                    .on("mouseout", function (event, d) {
+                        highlight
+                            .attr("d", null)
+                            .attr("stroke", "none")
+                            .attr("stroke-width", 0);
+
+                        if (config.labels === "hover") {
+                            labels
+                                .filter(labelData => labelData.data.species === d.data.species)
+                                .style("opacity", 0);
+                        }
+                    });
+            });
+        });
+    </script>
+</body>
+
+</html>
