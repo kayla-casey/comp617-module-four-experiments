@@ -126,7 +126,7 @@
 
         const tooltip = d3.select("#tooltip");
 
-        d3.csv("../Iris.csv").then(rawData => {
+        d3.csv("Iris.csv").then(rawData => {
             const data = rawData.map(d => ({
                 petalwidth: +d.PetalWidthCm,
                 petallength: +d.PetalLengthCm,

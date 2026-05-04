@@ -110,7 +110,7 @@
             return { x: r * Math.cos(angle(i)), y: r * Math.sin(angle(i)) };
         }
 
-        d3.csv("../Iris.csv").then(data => {
+        d3.csv("Iris.csv").then(data => {
             const allSpecies = [...new Set(data.map(d => d.Species))];
 
             // min/max for consistent data across all charts
