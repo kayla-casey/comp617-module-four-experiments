@@ -4,6 +4,11 @@
         <title>Iris Pie Charts</title>
     </head>
     <body>
+        <header>
+            <h1 style="text-align: center; font-family: Arial, sans-serif;">Iris Pie Charts</h1>
+            <p style="text-align: center; font-family: Arial, sans-serif; margin-bottom: 30px;">Average Sepal Length by Species</p>
+        </header>
+
         <div id="pie-grid"></div>
         <script src="https://d3js.org/d3.v7.min.js"></script>
 
@@ -48,7 +53,7 @@
             ];
 
             const pie = d3.pie()
-            .value(d => d.count);
+            .value(d => d.value);
 
             const arc = d3.arc()
             .innerRadius(0)
@@ -64,8 +69,12 @@
 
             d3.csv("../Iris.csv").then(data => {
             const speciesCounts = Array.from(
-                d3.rollup(data, v => v.length, d => d.Species),
-                ([species, count]) => ({ species, count })
+                d3.rollup(
+                    data,
+                    v => d3.sum(v, d => +d.SepalLengthCm),
+                    d => d.Species
+                ),
+                ([species, value]) => ({ species, value })
             );
 
             const container = d3.select("#pie-grid")
@@ -123,7 +132,7 @@
                 .style("font-weight", "bold")
                 .style("pointer-events", "none")
                 .style("opacity", config.labels === "always" ? 1 : 0)
-                .text(d => `${d.data.species}: ${d.data.count}`);
+                .text(d => `${d.data.species}: ${d.data.value.toFixed(1)}`);
 
                 slices
                 .on("mouseover", function(event, d) {
